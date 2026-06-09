@@ -157,8 +157,18 @@ def generate_ics(matches, team_id_map):
         home_cn = translate_team(home_en)
         away_cn = translate_team(away_en)
         
+        # 1. 提取分组和阶段信息 (2026世界杯共有 A-L 共 12 个小组)
+        group_letter = match.get("group")  # 获取 A, B, C... 等组别
         stage_raw = match.get("type", "group")
         stage_cn = STAGE_TRANSLATIONS.get(stage_raw, "世界杯比赛")
+        
+        # 2. 动态拼装：如果是小组赛，标题和描述自动附带 A/B/C/D 组别
+        if stage_raw == "group" and group_letter:
+            stage_display = f"小组赛 ({group_letter}组)"
+            summary_title = f"🏆 {group_letter}组 | {home_cn} vs {away_cn}"
+        else:
+            stage_display = stage_cn
+            summary_title = f"🏆 {stage_cn} | {home_cn} vs {away_cn}"
         
         # 比赛时间解析
         local_date_str = match.get("local_date")  # 格式: "06/11/2026 13:00"
@@ -184,11 +194,12 @@ def generate_ics(matches, team_id_map):
 
         event = Event()
         
+        # 拼装最终日历事件
         if match.get("finished") == "TRUE":
             score_str = f"({match.get('home_score')}:{match.get('away_score')})"
             event.add('summary', f"【已完赛】{home_cn} {score_str} {away_cn}")
         else:
-            event.add('summary', f"🏆 {home_cn} vs {away_cn} | {stage_cn}")
+            event.add('summary', summary_title) # 这里使用了动态组装的标题 (例如: 🏆 A组 | 墨西哥 vs 南非)
             
         event.add('dtstart', dt_utc)
         event.add('dtend', dt_utc + timedelta(hours=2))
@@ -198,7 +209,7 @@ def generate_ics(matches, team_id_map):
         
         description = (
             f"⚽ 世界杯对阵：{home_cn} vs {away_cn}\n"
-            f"🏆 赛事阶段：{stage_cn}\n"
+            f"🏆 赛事阶段：{stage_display}\n"  # 这里使用了动态组装的阶段名 (例如: 小组赛 (A组))
             f"📍 比赛场馆：{venue_info['name']} ({venue_info['city']})\n"
             f"🕒 现场开球时间：{local_date_str} (当地时间)\n\n"
             f"============================\n"

@@ -6,19 +6,18 @@ from datetime import datetime, timedelta
 import pytz
 from icalendar import Calendar, Event
 
-# ==================== 1. 推广与变现配置区 ====================
+# ==================== 1. 推广与变现配置区 (在此修改您的广告) ====================
+# [提示]：在这里您可以随意修改或删除，即使删掉，下方的安全机制也会保证程序不会崩溃。
 CALENDAR_NAME = "2026美加墨世界杯赛程"
-#PROMO_TEXT_1 = "📺 2026世界杯高清免卡顿直播源 👉 https://yourdomain.com/live"
-#PROMO_TEXT_2 = "👕 官方正品球衣/观赛装备限时5折领券 👉 https://yourdomain.com/jersey"
-#PROMO_TEXT_3 = "✈️ 门票预订、酒店差旅全套省钱指南 👉 https://yourdomain.com/travel"
-#PROMO_DIRECT_URL = "https://yourdomain.com/worldcup-guide"
-# ==============================================================
+# PROMO_TEXT_1 = "📺 2026世界杯高清免卡顿直播源 👉 https://yourdomain.com/live"
+# PROMO_TEXT_2 = "👕 官方正品球衣/观赛装备限时5折领券 👉 https://yourdomain.com/jersey"
+# PROMO_TEXT_3 = "✈️ 门票预订、酒店差旅全套省钱指南 👉 https://yourdomain.com/travel"
+# PROMO_DIRECT_URL = "https://yourdomain.com/worldcup-guide"
+# ==============================================================================
 
 # 双数据源备份
 PRIMARY_API = "https://worldcup26.ir/get/games"
 FALLBACK_API = "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json"
-
-# 用于容灾合并国家名字的数据源
 TEAMS_API = "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json"
 
 # 16个主办球场及本地时区映射
@@ -41,14 +40,8 @@ STADIUM_INFO = {
     "16": {"name": "西雅图体育场 (Lumen Field / Seattle Stadium)", "city": "西雅图", "tz": "America/Los_Angeles"},
 }
 
-# 2026世界杯全部 48 支参赛球队中文翻译字典
+# 2026世界杯全部 48 支参赛球队（含所有可能出现的拼写变体与民主刚果容灾）
 TEAM_TRANSLATIONS = {
-    "Democratic Republic of Congo": "民主刚果",
-    "Democratic Republic of the Congo": "民主刚果",
-    "Congo, Dem. Rep.": "民主刚果",
-    "Congo, DR": "民主刚果",
-    "DR Congo": "民主刚果",
-    "Congo DR": "民主刚果",
     "USA": "美国", "United States": "美国", "Mexico": "墨西哥", "Canada": "加拿大",
     "Korea Republic": "韩国", "Republic of Korea": "韩国", "South Korea": "韩国",
     "South Africa": "南非", "Czechia": "捷克", "Czech Republic": "捷克",
@@ -62,7 +55,12 @@ TEAM_TRANSLATIONS = {
     "France": "法国", "Senegal": "塞内加尔", "Iraq": "伊拉克", "Norway": "挪威",
     "Argentina": "阿根廷", "Algeria": "阿尔及利亚", "Austria": "奥地利", "Jordan": "约旦",
     "Portugal": "葡萄牙", "DR Congo": "民主刚果", "Congo DR": "民主刚果", "Uzbekistan": "乌兹别克斯坦", "Colombia": "哥伦比亚",
-    "England": "英格兰", "Croatia": "克罗地亚", "Ghana": "加纳", "Panama": "巴拿马"
+    "England": "英格兰", "Croatia": "克罗地亚", "Ghana": "加纳", "Panama": "巴拿马",
+    # 民主刚果拼写补充（防止部分 API 漏掉 the 或者使用缩写）
+    "Democratic Republic of Congo": "民主刚果",
+    "Democratic Republic of the Congo": "民主刚果",
+    "Congo, Dem. Rep.": "民主刚果",
+    "Congo, DR": "民主刚果"
 }
 
 STAGE_TRANSLATIONS = {
@@ -70,19 +68,17 @@ STAGE_TRANSLATIONS = {
     "sf": "半决赛", "third": "三四名决赛", "final": "决赛"
 }
 
-# 模糊翻译匹配函数（支持大小写、多余空格自动校准）
 def translate_team(name):
     if not name:
         return "待定"
     
-    # 去除两端空格并转为全小写进行安全匹配
     name_clean = str(name).strip().lower()
     lower_translations = {k.lower(): v for k, v in TEAM_TRANSLATIONS.items()}
     
     if name_clean in lower_translations:
         return lower_translations[name_clean]
     
-    # 针对未确定队伍占位符进行汉化处理
+    # 未确定队伍占位符汉化
     placeholders = {
         "winner group": "小组第一",
         "runner-up group": "小组第二",
@@ -99,7 +95,6 @@ def translate_team(name):
     return translated
 
 def fetch_data():
-    # 1. 尝试先加载队伍名字映射
     team_id_map = {}
     try:
         print("正在从 GitHub 预载 48 支队伍的 ID 映射...")
@@ -113,7 +108,6 @@ def fetch_data():
     except Exception as e:
         print(f"队伍映射加载失败 (程序将依靠硬编码字段): {e}")
 
-    # 2. 拉取主 API
     try:
         print("正在从主 API 获取比赛数据...")
         res = requests.get(PRIMARY_API, timeout=15)
@@ -122,7 +116,6 @@ def fetch_data():
     except Exception as e:
         print(f"主 API 请求失败: {e}，正在切换至备用数据源...")
         
-    # 3. 拉取备用 API
     try:
         res = requests.get(FALLBACK_API, timeout=15)
         if res.status_code == 200:
@@ -132,10 +125,17 @@ def fetch_data():
         sys.exit(1)
 
 def generate_ics(matches, team_id_map):
+    # 【安全防御机制】防御式读取全局配置变量，防止用户在文件顶部误删导致 NameError 崩溃
+    cal_name = globals().get('CALENDAR_NAME', "2026美加墨世界杯赛程")
+    promo_t1 = globals().get('PROMO_TEXT_1', "")
+    promo_t2 = globals().get('PROMO_TEXT_2', "")
+    promo_t3 = globals().get('PROMO_TEXT_3', "")
+    promo_url = globals().get('PROMO_DIRECT_URL', "")
+
     cal = Calendar()
     cal.add('prodid', '-//2026 World Cup Calendar//CN')
     cal.add('version', '2.0')
-    cal.add('x-wr-calname', CALENDAR_NAME)
+    cal.add('x-wr-calname', cal_name)
     cal.add('x-wr-timezone', 'UTC')
 
     for match in matches:
@@ -157,12 +157,12 @@ def generate_ics(matches, team_id_map):
         home_cn = translate_team(home_en)
         away_cn = translate_team(away_en)
         
-        # 1. 提取分组和阶段信息 (2026世界杯共有 A-L 共 12 个小组)
-        group_letter = match.get("group")  # 获取 A, B, C... 等组别
+        # 提取分组和阶段信息
+        group_letter = match.get("group")
         stage_raw = match.get("type", "group")
         stage_cn = STAGE_TRANSLATIONS.get(stage_raw, "世界杯比赛")
         
-        # 2. 动态拼装：如果是小组赛，标题和描述自动附带 A/B/C/D 组别
+        # 动态拼装标题
         if stage_raw == "group" and group_letter:
             stage_display = f"小组赛 ({group_letter}组)"
             summary_title = f"🏆 {group_letter}组 | {home_cn} vs {away_cn}"
@@ -170,22 +170,17 @@ def generate_ics(matches, team_id_map):
             stage_display = stage_cn
             summary_title = f"🏆 {stage_cn} | {home_cn} vs {away_cn}"
         
-        # 比赛时间解析
-        local_date_str = match.get("local_date")  # 格式: "06/11/2026 13:00"
+        local_date_str = match.get("local_date")
         if not local_date_str:
             continue
             
         try:
             dt_local = datetime.strptime(local_date_str, "%m/%d/%Y %H:%M")
             stadium_tz = pytz.timezone(venue_info["tz"])
-            # 本地时间实例化
             dt_localized = stadium_tz.localize(dt_local)
-            # 全球统一转为标准 UTC 时间
             dt_utc = dt_localized.astimezone(pytz.utc)
-            # 打印控制台日志（方便调试）
             print(f"✅ [场次 {match_id}] {home_cn} vs {away_cn} | 当地时间: {local_date_str} ({venue_info['city']}) -> 已成功校准为 UTC: {dt_utc.strftime('%Y-%m-%d %H:%M:%S')}Z")
         except Exception as e:
-            # 安全防崩溃：若时区解析完全失败，默认以美加墨主时区 America/Mexico_City 进行校准
             dt_local = datetime.strptime(local_date_str, "%m/%d/%Y %H:%M")
             stadium_tz = pytz.timezone("America/Mexico_City")
             dt_localized = stadium_tz.localize(dt_local)
@@ -194,12 +189,11 @@ def generate_ics(matches, team_id_map):
 
         event = Event()
         
-        # 拼装最终日历事件
         if match.get("finished") == "TRUE":
             score_str = f"({match.get('home_score')}:{match.get('away_score')})"
             event.add('summary', f"【已完赛】{home_cn} {score_str} {away_cn}")
         else:
-            event.add('summary', summary_title) # 这里使用了动态组装的标题 (例如: 🏆 A组 | 墨西哥 vs 南非)
+            event.add('summary', summary_title)
             
         event.add('dtstart', dt_utc)
         event.add('dtend', dt_utc + timedelta(hours=2))
@@ -209,18 +203,18 @@ def generate_ics(matches, team_id_map):
         
         description = (
             f"⚽ 世界杯对阵：{home_cn} vs {away_cn}\n"
-            f"🏆 赛事阶段：{stage_display}\n"  # 这里使用了动态组装的阶段名 (例如: 小组赛 (A组))
+            f"🏆 赛事阶段：{stage_display}\n"
             f"📍 比赛场馆：{venue_info['name']} ({venue_info['city']})\n"
             f"🕒 现场开球时间：{local_date_str} (当地时间)\n\n"
             f"============================\n"
-            f"{PROMO_TEXT_1}\n"
-            f"{PROMO_TEXT_2}\n"
-            f"{PROMO_TEXT_3}"
+            f"{promo_t1}\n"
+            f"{promo_t2}\n"
+            f"{promo_t3}"
         )
         event.add('description', description)
         
-        if PROMO_DIRECT_URL:
-            event.add('url', PROMO_DIRECT_URL)
+        if promo_url:
+            event.add('url', promo_url)
             
         cal.add_component(event)
 

@@ -8,10 +8,10 @@ from icalendar import Calendar, Event
 
 # ==================== 1. 推广与变现配置区 (在此修改您的广告) ====================
 # [提示]：在这里您可以随意修改或删除，即使删掉，下方的安全机制也会保证程序不会崩溃。
-CALENDAR_NAME = "2026美加墨世界杯赛程【群聊+V：Thebesttheo】"
+CALENDAR_NAME = "2026美加墨世界杯赛程"
 # PROMO_TEXT_1 = "📺 2026世界杯高清免卡顿直播源 👉 https://yourdomain.com/live"
 # PROMO_TEXT_2 = "👕 官方正品球衣/观赛装备限时5折领券 👉 https://yourdomain.com/jersey"
-# PROMO_TEXT_3 = "✈️ 门票预订、酒店差旅全套省钱指南 👉 https://yourdomain.com/travel"
+PROMO_TEXT_3 = "【群聊+V：Thebesttheo】"
 # PROMO_DIRECT_URL = "https://yourdomain.com/worldcup-guide"
 # ==============================================================================
 

@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 import pytz
 from icalendar import Calendar, Event
 
-# ==================== 1. 推广与变现配置区 (在此修改您的广告) ====================
+# ==================== 1. 推广与变现配置区 ====================
 CALENDAR_NAME = "2026美加墨世界杯赛程"
 PROMO_TEXT_1 = "📺 2026世界杯高清免卡顿直播 👉 https://tv.cctv.com/live/cctv5"
 PROMO_TEXT_2 = "😋美团外卖大额红包 👉 http://dpurl.cn/PLhevzuz"
 PROMO_TEXT_3 = "🧧京东618无门槛红包 👉 https://u.jd.com/7rFuhfR"
 #PROMO_DIRECT_URL = "https://yourdomain.com/worldcup-guide"
-# ==============================================================================
+# ==============================================================
 
 # 双数据源备份
 PRIMARY_API = "https://worldcup26.ir/get/games"
@@ -101,22 +101,24 @@ def fetch_data():
                 team_id_map[str(t.get("id"))] = t.get("name_en")
             print("队伍 ID 映射加载成功！")
     except Exception as e:
-        print(f"队伍映射加载失败 (程序将依靠硬编码字段): {e}")
+        print(f"队伍映射加载失败: {e}")
 
     try:
-        print("正在从主 API 获取比赛数据...")
+        print("🔗 正在尝试连接实时比分 API [PRIMARY_API]...")
         res = requests.get(PRIMARY_API, timeout=15)
         if res.status_code == 200:
+            print("🚀 【成功】已连接到实时数据源！正在使用实时比分生成日历。")
             return res.json().get("games", []), team_id_map
     except Exception as e:
-        print(f"主 API 请求失败: {e}，正在切换至备用数据源...")
+        print(f"❌ 【失败】无法连接到实时 API，报错原因为: {e}")
+        print("⚠️ 【警告】程序已启用静态备份源。注意：备份源仅含静态赛程，【无实时完赛比分】！")
         
     try:
         res = requests.get(FALLBACK_API, timeout=15)
         if res.status_code == 200:
             return res.json(), team_id_map
     except Exception as e:
-        print(f"备用数据源请求失败: {e}")
+        print(f"❌ 备份源也加载失败: {e}")
         sys.exit(1)
 
 def generate_ics(matches, team_id_map):
@@ -137,26 +139,47 @@ def generate_ics(matches, team_id_map):
         stadium_id = str(match.get("stadium_id", "1"))
         venue_info = STADIUM_INFO.get(stadium_id, {"name": "美加墨体育场", "city": "主办城市", "tz": "America/Mexico_City"})
 
-        # 精准组装队伍英文名
-        home_en = match.get("home_team_name_en")
+        # ==================== 1. 深度兼容性国家队解析 ====================
+        home_en = None
+        for key in ["home_team_name_en", "homeTeamNameEn", "home_team_name"]:
+            if match.get(key):
+                home_en = match.get(key)
+                break
         if not home_en:
-            home_id = str(match.get("home_team_id", ""))
-            home_en = team_id_map.get(home_id) or match.get("home_team_label")
+            for obj_key in ["homeTeam", "home_team"]:
+                obj = match.get(obj_key)
+                if isinstance(obj, dict):
+                    home_en = obj.get("name") or obj.get("name_en")
+                    if home_en:
+                        break
+        if not home_en:
+            home_id = str(match.get("home_team_id") or match.get("homeTeamId") or "")
+            home_en = team_id_map.get(home_id) or match.get("home_team_label") or match.get("homeTeamLabel")
             
-        away_en = match.get("away_team_name_en")
+        away_en = None
+        for key in ["away_team_name_en", "awayTeamNameEn", "away_team_name"]:
+            if match.get(key):
+                away_en = match.get(key)
+                break
         if not away_en:
-            away_id = str(match.get("away_team_id", ""))
-            away_en = team_id_map.get(away_id) or match.get("away_team_label")
-        
+            for obj_key in ["awayTeam", "away_team"]:
+                obj = match.get(obj_key)
+                if isinstance(obj, dict):
+                    away_en = obj.get("name") or obj.get("name_en")
+                    if away_en:
+                        break
+        if not away_en:
+            away_id = str(match.get("away_team_id") or match.get("awayTeamId") or "")
+            away_en = team_id_map.get(away_id) or match.get("away_team_label") or match.get("awayTeamLabel")
+
         home_cn = translate_team(home_en)
         away_cn = translate_team(away_en)
         
-        # 提取分组和阶段信息
+        # 提取分组和阶段
         group_letter = match.get("group")
         stage_raw = match.get("type", "group")
         stage_cn = STAGE_TRANSLATIONS.get(stage_raw, "世界杯比赛")
         
-        # 动态拼装标题
         if stage_raw == "group" and group_letter:
             stage_display = f"小组赛 ({group_letter}组)"
             summary_title = f"🏆 {group_letter}组 | {home_cn} vs {away_cn}"
@@ -181,10 +204,13 @@ def generate_ics(matches, team_id_map):
 
         event = Event()
         
-        # 🟢 【核心修复：高容错完赛判断机制】
-        # 兼容处理各种数据类型：支持布尔值 (True/False)、大小写字符串 ("TRUE"/"true")、数值 (1/0)
+        # ==================== 2. 核心：双轨道完赛状态判定 ====================
         finished_val = match.get("finished")
+        status_val = match.get("status")
+        
         is_finished = False
+        
+        # 轨道一：通过 finished 字段判定
         if isinstance(finished_val, bool):
             is_finished = finished_val
         elif isinstance(finished_val, str):
@@ -192,10 +218,21 @@ def generate_ics(matches, team_id_map):
         elif isinstance(finished_val, (int, float)):
             is_finished = int(finished_val) == 1
             
+        # 轨道二：通过 status 字段判定 (兼容 live / completed 状态命名)
+        if not is_finished and status_val:
+            is_finished = str(status_val).strip().lower() in ["completed", "finished", "ended", "true"]
+            
         if is_finished:
-            # 兼容读取比分：防止 null 字符串和空值引发格式问题
-            h_score = match.get("home_score")
-            a_score = match.get("away_score")
+            # ==================== 3. 深度兼容性比分提取 ====================
+            h_score = match.get("home_score") if match.get("home_score") is not None else match.get("homeScore")
+            a_score = match.get("away_score") if match.get("away_score") is not None else match.get("awayScore")
+            
+            # 防止嵌套对象里取不到的情况
+            if h_score is None and isinstance(match.get("homeTeam"), dict):
+                h_score = match.get("homeTeam").get("score")
+            if a_score is None and isinstance(match.get("awayTeam"), dict):
+                a_score = match.get("awayTeam").get("score")
+
             h_score = "0" if h_score is None or str(h_score).strip().lower() == "null" else str(h_score)
             a_score = "0" if a_score is None or str(a_score).strip().lower() == "null" else str(a_score)
             

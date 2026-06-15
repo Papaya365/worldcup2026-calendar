@@ -19,6 +19,9 @@ PRIMARY_API = "https://worldcup26.ir/get/games"
 FALLBACK_API = "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json"
 TEAMS_API = "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json"
 
+# 本地历史比分锁定文件
+RESULTS_CACHE_FILE = "worldcup2026_results.json"
+
 # 16个主办球场及本地时区映射
 STADIUM_INFO = {
     "1": {"name": "阿兹特克球场 (Estadio Azteca)", "city": "墨西哥城", "tz": "America/Mexico_City"},
@@ -134,12 +137,22 @@ def generate_ics(matches, team_id_map):
     cal.add('x-wr-calname', cal_name)
     cal.add('x-wr-timezone', 'UTC')
 
+    # 加载本地历史已锁定的比分
+    saved_results = {}
+    if os.path.exists(RESULTS_CACHE_FILE):
+        try:
+            with open(RESULTS_CACHE_FILE, "r", encoding="utf-8") as f:
+                saved_results = json.load(f)
+            print(f"📁 成功加载本地历史比分库，共包含 {len(saved_results)} 场完赛数据。")
+        except Exception as e:
+            print(f"⚠️ 读取历史比分缓存失败: {e}")
+
     for match in matches:
-        match_id = match.get("id")
+        match_id = str(match.get("id"))
         stadium_id = str(match.get("stadium_id", "1"))
         venue_info = STADIUM_INFO.get(stadium_id, {"name": "美加墨体育场", "city": "主办城市", "tz": "America/Mexico_City"})
 
-        # ==================== 1. 深度兼容性国家队解析 ====================
+        # 精准组装队伍英文名
         home_en = None
         for key in ["home_team_name_en", "homeTeamNameEn", "home_team_name"]:
             if match.get(key):
@@ -204,38 +217,52 @@ def generate_ics(matches, team_id_map):
 
         event = Event()
         
-        # ==================== 2. 核心：双轨道完赛状态判定 ====================
-        finished_val = match.get("finished")
-        status_val = match.get("status")
-        
+        # ==================== 完赛状态与比分锁定逻辑 ====================
         is_finished = False
-        
-        # 轨道一：通过 finished 字段判定
-        if isinstance(finished_val, bool):
-            is_finished = finished_val
-        elif isinstance(finished_val, str):
-            is_finished = finished_val.strip().upper() in ["TRUE", "YES", "1"]
-        elif isinstance(finished_val, (int, float)):
-            is_finished = int(finished_val) == 1
+        h_score = "0"
+        a_score = "0"
+
+        # 🟢 【第一优先级】：如果本地比分库里已经锁定了这场的比分，直接强行套用！
+        if match_id in saved_results and saved_results[match_id].get("finished"):
+            is_finished = True
+            h_score = str(saved_results[match_id].get("home_score", "0"))
+            a_score = str(saved_results[match_id].get("away_score", "0"))
+        else:
+            # 🔵 【第二优先级】：本地没有，从当前拉取的 API 数据中分析
+            finished_val = match.get("finished")
+            status_val = match.get("status")
             
-        # 轨道二：通过 status 字段判定 (兼容 live / completed 状态命名)
-        if not is_finished and status_val:
-            is_finished = str(status_val).strip().lower() in ["completed", "finished", "ended", "true"]
+            if isinstance(finished_val, bool):
+                is_finished = finished_val
+            elif isinstance(finished_val, str):
+                is_finished = finished_val.strip().upper() in ["TRUE", "YES", "1"]
+            elif isinstance(finished_val, (int, float)):
+                is_finished = int(finished_val) == 1
+                
+            if not is_finished and status_val:
+                is_finished = str(status_val).strip().lower() in ["completed", "finished", "ended", "true"]
+                
+            if is_finished:
+                # 提取比分
+                h_score_val = match.get("home_score") if match.get("home_score") is not None else match.get("homeScore")
+                a_score_val = match.get("away_score") if match.get("away_score") is not None else match.get("awayScore")
+                
+                if h_score_val is None and isinstance(match.get("homeTeam"), dict):
+                    h_score_val = match.get("homeTeam").get("score")
+                if a_score_val is None and isinstance(match.get("awayTeam"), dict):
+                    a_score_val = match.get("awayTeam").get("score")
+
+                h_score = "0" if h_score_val is None or str(h_score_val).strip().lower() == "null" else str(h_score_val)
+                a_score = "0" if a_score_val is None or str(a_score_val).strip().lower() == "null" else str(a_score_val)
+                
+                # 写入本地内存，准备持久化保存
+                saved_results[match_id] = {
+                    "finished": True,
+                    "home_score": h_score,
+                    "away_score": a_score
+                }
             
         if is_finished:
-            # ==================== 3. 深度兼容性比分提取 ====================
-            h_score = match.get("home_score") if match.get("home_score") is not None else match.get("homeScore")
-            a_score = match.get("away_score") if match.get("away_score") is not None else match.get("awayScore")
-            
-            # 防止嵌套对象里取不到的情况
-            if h_score is None and isinstance(match.get("homeTeam"), dict):
-                h_score = match.get("homeTeam").get("score")
-            if a_score is None and isinstance(match.get("awayTeam"), dict):
-                a_score = match.get("awayTeam").get("score")
-
-            h_score = "0" if h_score is None or str(h_score).strip().lower() == "null" else str(h_score)
-            a_score = "0" if a_score is None or str(a_score).strip().lower() == "null" else str(a_score)
-            
             event.add('summary', f"【已完赛】{home_cn} ({h_score}:{a_score}) {away_cn}")
         else:
             event.add('summary', summary_title)
@@ -263,8 +290,18 @@ def generate_ics(matches, team_id_map):
             
         cal.add_component(event)
 
+    # 保存日历
     with open("worldcup2026.ics", "wb") as f:
         f.write(cal.to_ical())
+        
+    # 保存本地比分锁定文件
+    try:
+        with open(RESULTS_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(saved_results, f, ensure_ascii=False, indent=4)
+        print(f"💾 比分数据已成功锁定并保存至: {RESULTS_CACHE_FILE}")
+    except Exception as e:
+        print(f"⚠️ 保存历史比分库失败: {e}")
+        
     print("日历文件 worldcup2026.ics 生成完毕。")
 
 if __name__ == "__main__":

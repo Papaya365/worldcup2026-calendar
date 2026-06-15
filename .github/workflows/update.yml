@@ -2,8 +2,7 @@ name: 自动更新 2026 世界杯日历
 
 on:
   schedule:
-    # 🟢 【高能更新】：全年无休，每 30 分钟雷打不动自动在云端运行一次
-    # 这不仅能让更新延迟降到最低，还能完美避开 GitHub 的 Cron 日期范围解析 Bug！
+    # 全年无休，每 30 分钟雷打不动自动运行一次
     - cron: '*/30 * * * *'
   workflow_dispatch: # 保留网页上手动触发运行的功能
 
@@ -35,18 +34,27 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 🟢 【核心修改一】：同时把日历世界文件（.ics）和比分锁定数据库（.json）打包提交保存！
-        git add worldcup2026.ics worldcup2026_results.json
+        # 1. 优先安全添加日历主文件
+        git add worldcup2026.ics
         
-        # 检测到内容变动时才会产生提交，避免产生无意义的空记录 [skip ci] 用于防止产生无限循环构建
+        # 2. 🟢【防御性 Git 添加】：只有当比分库文件真实存在时才添加，不存在则安全跳过，绝不报错崩溃！
+        if [ -f "worldcup2026_results.json" ]; then
+          git add worldcup2026_results.json
+          echo "✅ 成功找到比分锁定库，已加入提交列表。"
+        else
+          echo "⚠️ 未检测到比分锁定库，跳过添加，继续下一步。"
+        fi
+        
         git diff-index --quiet HEAD || git commit -m "自动同步世界杯最新对阵 [skip ci]"
         git push origin HEAD:main
 
     - name: 自动同步到 Gitee 仓库
       run: |
-        # 🟢 【核心修改二】：请务必将下方链接中的 [你的Gitee用户名] 和 [你的Gitee仓库名] 替换为您在 Gitee 上的真实名称！
-        # 示例：git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/zhangsan/worldcup-calendar.git
+        # 3. 🟢【防御性远程连接】：先强行清除可能残留的旧 gitee 链接，彻底免疫“远程链接已存在”报错
+        git remote remove gitee 2>/dev/null || true
+        
+        # ⚠️ 【请在此修改】：务必将下方链接中的 [你的Gitee用户名] 和 [你的Gitee仓库名] 替换为您在 Gitee 上的真实路径！
         git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/你的Gitee用户名/你的Gitee仓库名.git
         
-        # 强制将最新代码推送到 Gitee 的主分支（请根据您 Gitee 默认分支叫 master 还是 main 决定，如果是 main，请改为 HEAD:main）
+        # 强制推送到 Gitee 的主分支（请根据您 Gitee 的默认分支是 master 还是 main 决定，如果是 main，请改为 HEAD:main）
         git push -f gitee HEAD:master

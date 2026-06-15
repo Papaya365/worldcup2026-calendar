@@ -2,9 +2,10 @@ name: 自动更新 2026 世界杯日历
 
 on:
   schedule:
-    # 彻底简化：全年无休，每 30 分钟雷打不动自动运行一次（最稳妥，100% 避开解析 Bug）
+    # 🟢 【高能更新】：全年无休，每 30 分钟雷打不动自动在云端运行一次
+    # 这不仅能让更新延迟降到最低，还能完美避开 GitHub 的 Cron 日期范围解析 Bug！
     - cron: '*/30 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # 保留网页上手动触发运行的功能
 
 jobs:
   build:
@@ -14,7 +15,7 @@ jobs:
     - name: 检出代码
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # 获取完整提交历史以供推送
+        fetch-depth: 0 # 获取完整提交历史以供推送至 Gitee
 
     - name: 设置 Python 3.10
       uses: actions/setup-python@v5
@@ -26,24 +27,26 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: 运行同步脚本并生成 ICS
+    - name: 运行同步脚本并生成日历
       run: python update_calendar.py
 
-- name: 提交更新到 GitHub 仓库
+    - name: 提交更新到 GitHub 仓库
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        # 🟢 【修改处】：同时把比分锁定库 worldcup2026_results.json 提交保存！
+        
+        # 🟢 【核心修改一】：同时把日历世界文件（.ics）和比分锁定数据库（.json）打包提交保存！
         git add worldcup2026.ics worldcup2026_results.json
+        
+        # 检测到内容变动时才会产生提交，避免产生无意义的空记录 [skip ci] 用于防止产生无限循环构建
         git diff-index --quiet HEAD || git commit -m "自动同步世界杯最新对阵 [skip ci]"
         git push origin HEAD:main
 
-    # ============= ✨ 新增：全自动推送到 Gitee =============
     - name: 自动同步到 Gitee 仓库
       run: |
-        # 请把下方 URL 中的 [你的Gitee用户名] 和 [你的Gitee仓库名] 替换为您自己的真实名字！
-        # 例如：https://oauth2:...@gitee.com/zhangsan/worldcup-calendar.git
-        git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/papaya365/worldcup2026-calendar.git
+        # 🟢 【核心修改二】：请务必将下方链接中的 [你的Gitee用户名] 和 [你的Gitee仓库名] 替换为您在 Gitee 上的真实名称！
+        # 示例：git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/zhangsan/worldcup-calendar.git
+        git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/你的Gitee用户名/你的Gitee仓库名.git
         
-        # 强制将最新代码推送到 Gitee 的 master 分支（国内 Gitee 默认主分支通常叫 master 或 main）
-        git push -f gitee HEAD:main
+        # 强制将最新代码推送到 Gitee 的主分支（请根据您 Gitee 默认分支叫 master 还是 main 决定，如果是 main，请改为 HEAD:main）
+        git push -f gitee HEAD:master

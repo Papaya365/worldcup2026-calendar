@@ -49,6 +49,8 @@ jobs:
         git push origin HEAD:main
 
     - name: 自动同步到 Gitee 仓库
+          # 🟢 【核心添加】：即使 Gitee 服务器发生临时网络波动、超时、闪断，也允许此步骤失败并继续，绝不让整个工作流报红
+      continue-on-error: true
       run: |
         # 3. 🟢【防御性远程连接】：先强行清除可能残留的旧 gitee 链接，彻底免疫“远程链接已存在”报错
         git remote remove gitee 2>/dev/null || true

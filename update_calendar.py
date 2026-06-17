@@ -42,7 +42,7 @@ STADIUM_INFO = {
     "16": {"name": "西雅图体育场 (Lumen Field / Seattle Stadium)", "city": "西雅图", "tz": "America/Los_Angeles"},
 }
 
-# 2026世界杯全部 48 支参赛球队
+# 2026世界杯全部 48 支参赛球队（已将民主刚果校准为国内官方标准译名：刚果(金)）
 TEAM_TRANSLATIONS = {
     "USA": "美国", "United States": "美国", "Mexico": "墨西哥", "Canada": "加拿大",
     "Korea Republic": "韩国", "Republic of Korea": "韩国", "South Korea": "韩国",
@@ -56,10 +56,16 @@ TEAM_TRANSLATIONS = {
     "Spain": "西班牙", "Cape Verde": "佛得角", "Cabo Verde": "佛得角", "Saudi Arabia": "沙特", "Uruguay": "乌拉圭",
     "France": "法国", "Senegal": "塞内加尔", "Iraq": "伊拉克", "Norway": "挪威",
     "Argentina": "阿根廷", "Algeria": "阿尔及利亚", "Austria": "奥地利", "Jordan": "约旦",
-    "Portugal": "葡萄牙", "DR Congo": "民主刚果", "Congo DR": "民主刚果", "Uzbekistan": "乌兹别克斯坦", "Colombia": "哥伦比亚",
+    "Portugal": "葡萄牙", "Uzbekistan": "乌兹别克斯坦", "Colombia": "哥伦比亚",
     "England": "英格兰", "Croatia": "克罗地亚", "Ghana": "加纳", "Panama": "巴拿马",
-    "Democratic Republic of Congo": "民主刚果", "Democratic Republic of the Congo": "民主刚果",
-    "Congo, Dem. Rep.": "民主刚果", "Congo, DR": "民主刚果"
+    
+    # 🟢 刚果(金) 各种拼写和缩写形式的统合映射，确保 100% 汉化成功
+    "Democratic Republic of Congo": "刚果(金)",
+    "Democratic Republic of the Congo": "刚果(金)",
+    "DR Congo": "刚果(金)",
+    "Congo DR": "刚果(金)",
+    "Congo, Dem. Rep.": "刚果(金)",
+    "Congo, DR": "刚果(金)"
 }
 
 STAGE_TRANSLATIONS = {

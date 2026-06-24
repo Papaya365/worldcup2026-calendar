@@ -9,8 +9,8 @@ from icalendar import Calendar, Event
 # ==================== 1. 推广与变现配置区 ====================
 CALENDAR_NAME = "2026美加墨世界杯赛程"
 PROMO_TEXT_1 = "📺 2026世界杯高清免卡顿直播 👉 https://tv.cctv.com/live/cctv5"
-PROMO_TEXT_2 = "😋美团外卖大额红包 👉 http://dpurl.cn/PLhevzuz"
-PROMO_TEXT_3 = "🧧京东618无门槛红包 👉 https://u.jd.com/7rFuhfR"
+# PROMO_TEXT_2 = "😋美团外卖大额红包 👉 http://dpurl.cn/PLhevzuz"
+# PROMO_TEXT_3 = "🧧京东618无门槛红包 👉 https://u.jd.com/7rFuhfR"
 #PROMO_DIRECT_URL = "https://yourdomain.com/worldcup-guide"
 # ==============================================================
 

@@ -278,5 +278,25 @@
         "finished": true,
         "home_score": "2",
         "away_score": "1"
+    },
+    "59": {
+        "finished": true,
+        "home_score": "1",
+        "away_score": "1"
+    },
+    "60": {
+        "finished": true,
+        "home_score": "1",
+        "away_score": "3"
+    },
+    "58": {
+        "finished": true,
+        "home_score": "3",
+        "away_score": "2"
+    },
+    "57": {
+        "finished": true,
+        "home_score": "0",
+        "away_score": "0"
     }
 }

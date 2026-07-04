@@ -438,5 +438,10 @@
         "finished": true,
         "home_score": "1",
         "away_score": "1"
+    },
+    "90": {
+        "finished": true,
+        "home_score": "0",
+        "away_score": "3"
     }
 }
